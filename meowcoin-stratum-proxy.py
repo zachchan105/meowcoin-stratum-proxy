@@ -12,7 +12,7 @@ import logging
 import coloredlogs
 
 from aiohttp import ClientSession
-from aiorpcx import RPCSession, JSONRPCConnection, JSONRPCAutoDetect, Request, serve_rs, handler_invocation, RPCError, TaskGroup
+from aiorpcx import RPCSession, JSONRPCConnection, JSONRPCAutoDetect, JSONRPCv1, Request, serve_rs, handler_invocation, RPCError, TaskGroup
 from functools import partial
 from hashlib import sha256
 from typing import Set, List, Optional
@@ -129,7 +129,7 @@ def lookup_old_state(queue, id: str) -> Optional[TemplateState]:
 class StratumSession(RPCSession):
 
     def __init__(self, state: TemplateState, old_states, testnet: bool, verbose: bool, node_url: str, transport):
-        connection = JSONRPCConnection(JSONRPCAutoDetect)
+        connection = JSONRPCConnection(JSONRPCv1)
         super().__init__(transport, connection=connection)
         self._state = state
         self._testnet = testnet
