@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  meowcoin-stratum-proxy:
+    build: .
+    container_name: meowcoin-stratum-proxy
+    ports:
+      - "54321:54321"
+    environment:
+      - RPC_HOST=127.0.0.1
+      - RPC_PORT=9766
+      - RPC_USER=rpcuser
+      - RPC_PASS=rpcpass
+      - VERBOSE=false
+    command: >
+      python meowcoin-stratum-proxy.py
+      --address 0.0.0.0
+      --port 54321
+      --rpcip ${RPC_HOST}
+      --rpcport ${RPC_PORT}
+      --rpcuser ${RPC_USER}
+      --rpcpass ${RPC_PASS}
+      --verbose
+    restart: unless-stopped

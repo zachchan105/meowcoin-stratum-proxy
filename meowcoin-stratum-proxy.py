@@ -6,7 +6,6 @@ import time
 import os
 
 import base58
-import sha3
 
 import logging
 import coloredlogs
@@ -360,7 +359,7 @@ async def stateUpdater(state: TemplateState, old_states, drop_after, verbose, no
                         if not state.seedHash:
                             seed_hash = bytes(32)
                             for _ in range(height_int//MEOWPOW_EPOCH_LENGTH):
-                                k = sha3.keccak_256()
+                                k = hashlib.sha3_256()
                                 k.update(seed_hash)
                                 seed_hash = k.digest()
                             if verbose:
@@ -369,7 +368,7 @@ async def stateUpdater(state: TemplateState, old_states, drop_after, verbose, no
                             state.seedHash = seed_hash
                         elif state.height % MEOWPOW_EPOCH_LENGTH == 0:
                             # Hashing is expensive, so want use the old val
-                            k = sha3.keccak_256()
+                            k = hashlib.sha3_256()
                             k.update(state.seedHash)
                             seed_hash = k.digest()
                             if verbose:
@@ -384,7 +383,7 @@ async def stateUpdater(state: TemplateState, old_states, drop_after, verbose, no
                             # We must go back an epoch; recalc
                             seed_hash = bytes(32)
                             for _ in range(height_int//MEOWPOW_EPOCH_LENGTH):
-                                k = sha3.keccak_256()
+                                k = hashlib.sha3_256()
                                 k.update(seed_hash)
                                 seed_hash = k.digest()
                             if verbose:

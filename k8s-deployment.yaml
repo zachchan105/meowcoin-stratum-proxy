@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meowcoin-stratum-proxy
+  labels:
+    app: meowcoin-stratum-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meowcoin-stratum-proxy
+  template:
+    metadata:
+      labels:
+        app: meowcoin-stratum-proxy
+    spec:
+      containers:
+      - name: meowcoin-stratum-proxy
+        image: zachprice105/meowcoin-stratum-proxy:latest
+        ports:
+        - containerPort: 54321
+          name: stratum
+        env:
+        - name: RPC_HOST
+          value: "127.0.0.1"  # Change to your Meowcoin node IP
+        - name: RPC_PORT
+          value: "9766"        # Change to your Meowcoin RPC port
+        - name: RPC_USER
+          value: "rpcuser"     # Change to your RPC username
+        - name: RPC_PASS
+          value: "rpcpass"     # Change to your RPC password
+        - name: VERBOSE
+          value: "false"       # Set to "true" for debug logging
+        command:
+        - python
+        - meowcoin-stratum-proxy.py
+        - --address
+        - 0.0.0.0
+        - --port
+        - "54321"
+        - --rpcip
+        - $(RPC_HOST)
+        - --rpcport
+        - $(RPC_PORT)
+        - --rpcuser
+        - $(RPC_USER)
+        - --rpcpass
+        - $(RPC_PASS)
+        args:
+        - --verbose
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meowcoin-stratum-proxy-service
+  labels:
+    app: meowcoin-stratum-proxy
+spec:
+  type: LoadBalancer  # Change to NodePort or ClusterIP as needed
+  ports:
+  - port: 54321
+    targetPort: 54321
+    protocol: TCP
+    name: stratum
+  selector:
+    app: meowcoin-stratum-proxy 
