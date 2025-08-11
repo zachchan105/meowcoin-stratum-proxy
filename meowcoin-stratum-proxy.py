@@ -304,193 +304,203 @@ class StratumSession(RPCSession):
         return True
 
 async def stateUpdater(state: TemplateState, old_states, drop_after, verbose, node_url: str):
-    if not state.pub_h160:
-        return
-    data = {
-        'jsonrpc':'2.0',
-        'id':'0',
-        'method':'getblocktemplate',
-        'params':[]
-    }
-    async with ClientSession() as session:
-        async with session.post(f'{node_url}', data=json.dumps(data)) as resp:
-            try:
-                json_obj = await resp.json()
-                if json_obj.get('error', None):
-                    raise Exception(json_obj.get('error', None))
+    try:
+        if not state.pub_h160:
+            return
+        data = {
+            'jsonrpc':'2.0',
+            'id':'0',
+            'method':'getblocktemplate',
+            'params':[]
+        }
+        async with ClientSession() as session:
+            async with session.post(f'{node_url}', data=json.dumps(data)) as resp:
+                try:
+                    json_obj = await resp.json()
+                    if json_obj.get('error', None):
+                        raise Exception(json_obj.get('error', None))
 
-                version_int: int = json_obj['result']['version']
-                height_int: int = json_obj['result']['height'] 
-                bits_hex: str = json_obj['result']['bits'] 
-                prev_hash_hex: str = json_obj['result']['previousblockhash']
-                txs_list: List = json_obj['result']['transactions']
-                coinbase_sats_int: int = json_obj['result']['coinbasevalue'] 
-                witness_hex: str = json_obj['result']['default_witness_commitment']
-                coinbase_flags_hex: str = json_obj['result']['coinbaseaux']['flags']
-                target_hex: str = json_obj['result']['target']
-                #target_hex: str = '000000ff00000000000000000000000000000000000000000000000000000000'
-                community_address: str = json_obj['result']['CommunityAutonomousAddress']
-                community_sats_int: int = json_obj['result']['CommunityAutonomousValue']
-
-                ts = int(time.time())
-                new_witness = witness_hex != state.current_commitment
-                state.current_commitment = witness_hex
-                state.target = target_hex
-                state.bits = bits_hex
-                state.version = version_int
-                state.prevHash = bytes.fromhex(prev_hash_hex)[::-1]
-
-                new_block = False
-
-                original_state = None
-
-                # The following will only change when there is a new block.
-                # Force update is unnecessary
-                if state.height == -1 or state.height != height_int:
-                    original_state = deepcopy(state)
-                    # New block, update everything
                     if verbose:
-                        state.logger.info('%s New block, updating state',
-                                    state.tag)                                
-                    new_block = True
+                        state.logger.info('Block template received: %s', json_obj['result'].get('height', 'unknown'))
 
-                    # Generate seed hash #
-                    if state.height == - 1 or height_int > state.height:
-                        if not state.seedHash:
-                            seed_hash = bytes(32)
-                            for _ in range(height_int//MEOWPOW_EPOCH_LENGTH):
-                                k = hashlib.sha3_256()
-                                k.update(seed_hash)
-                                seed_hash = k.digest()
-                            if verbose:
-                                state.logger.info('Initialized %s seedhash to \x1b[1m%s\x1b[0m',
-                                                                state.tag, seed_hash.hex())                                
-                            state.seedHash = seed_hash
-                        elif state.height % MEOWPOW_EPOCH_LENGTH == 0:
-                            # Hashing is expensive, so want use the old val
-                            k = hashlib.sha3_256()
-                            k.update(state.seedHash)
-                            seed_hash = k.digest()
-                            if verbose:
-                                state.logger.info('Updated %s seedhash to \x1b[1m%s\x1b[0m',
-                                                                state.tag, seed_hash.hex())                                
-                            state.seedHash = seed_hash
-                    elif state.height > height_int:
-                        # Maybe a chain reorg?
-                        
-                        # If the difference between heights is greater than how far we are into the epoch
-                        if state.height % MEOWPOW_EPOCH_LENGTH - (state.height - height_int) < 0:
-                            # We must go back an epoch; recalc
-                            seed_hash = bytes(32)
-                            for _ in range(height_int//MEOWPOW_EPOCH_LENGTH):
-                                k = hashlib.sha3_256()
-                                k.update(seed_hash)
-                                seed_hash = k.digest()
-                            if verbose:
-                                state.logger.info('Reverted %s seedhash to \x1b[1m%s\x1b[0m',
-                                                                state.tag, seed_hash.hex())                                
-                            state.seedHash = seed_hash
+                    version_int: int = json_obj['result']['version']
+                    height_int: int = json_obj['result']['height'] 
+                    bits_hex: str = json_obj['result']['bits'] 
+                    prev_hash_hex: str = json_obj['result']['previousblockhash']
+                    txs_list: List = json_obj['result']['transactions']
+                    coinbase_sats_int: int = json_obj['result']['coinbasevalue'] 
+                    witness_hex: str = json_obj['result']['default_witness_commitment']
+                    coinbase_flags_hex: str = json_obj['result']['coinbaseaux']['flags']
+                    target_hex: str = json_obj['result']['target']
+                    #target_hex: str = '000000ff00000000000000000000000000000000000000000000000000000000'
+                    community_address: str = json_obj['result']['CommunityAutonomousAddress']
+                    community_sats_int: int = json_obj['result']['CommunityAutonomousValue']
 
-                    # Done with seed hash #
-                    state.height = height_int
+                    ts = int(time.time())
+                    new_witness = witness_hex != state.current_commitment
+                    state.current_commitment = witness_hex
+                    state.target = target_hex
+                    state.bits = bits_hex
+                    state.version = version_int
+                    state.prevHash = bytes.fromhex(prev_hash_hex)[::-1]
 
-                # The following occurs during both new blocks & new txs & nothing happens for 60s (magic number)
-                if new_block or new_witness or state.timestamp + 60 < ts:
-                    # Generate coinbase #
+                    new_block = False
 
-                    if original_state is None:
+                    original_state = None
+
+                    # The following will only change when there is a new block.
+                    # Force update is unnecessary
+                    if state.height == -1 or state.height != height_int:
                         original_state = deepcopy(state)
+                        # New block, update everything
+                        if verbose:
+                            state.logger.info('%s New block, updating state',
+                                        state.tag)                                
+                        new_block = True
 
-                    bytes_needed_sub_1 = 0
-                    while True:
-                        if state.height <= (2**(7 + (8 * bytes_needed_sub_1))) - 1:
-                            break
-                        bytes_needed_sub_1 += 1
+                        # Generate seed hash #
+                        if state.height == - 1 or height_int > state.height:
+                            if not state.seedHash:
+                                seed_hash = bytes(32)
+                                for _ in range(height_int//MEOWPOW_EPOCH_LENGTH):
+                                    k = hashlib.sha3_256()
+                                    k.update(seed_hash)
+                                    seed_hash = k.digest()
+                                if verbose:
+                                    state.logger.info('Initialized %s seedhash to \x1b[1m%s\x1b[0m',
+                                                                    state.tag, seed_hash.hex())                                
+                                state.seedHash = seed_hash
+                            elif state.height % MEOWPOW_EPOCH_LENGTH == 0:
+                                # Hashing is expensive, so want use the old val
+                                k = hashlib.sha3_256()
+                                k.update(state.seedHash)
+                                seed_hash = k.digest()
+                                if verbose:
+                                    state.logger.info('Updated %s seedhash to \x1b[1m%s\x1b[0m',
+                                                                    state.tag, seed_hash.hex())                                
+                                state.seedHash = seed_hash
+                        elif state.height > height_int:
+                            # Maybe a chain reorg?
+                            
+                            # If the difference between heights is greater than how far we are into the epoch
+                            if state.height % MEOWPOW_EPOCH_LENGTH - (state.height - height_int) < 0:
+                                # We must go back an epoch; recalc
+                                seed_hash = bytes(32)
+                                for _ in range(height_int//MEOWPOW_EPOCH_LENGTH):
+                                    k = hashlib.sha3_256()
+                                    k.update(seed_hash)
+                                    seed_hash = k.digest()
+                                if verbose:
+                                    state.logger.info('Reverted %s seedhash to \x1b[1m%s\x1b[0m',
+                                                                    state.tag, seed_hash.hex())                                
+                                state.seedHash = seed_hash
 
-                    bip34_height = state.height.to_bytes(bytes_needed_sub_1 + 1, 'little')
+                        # Done with seed hash #
+                        state.height = height_int
 
-                    # Note that there is a max allowed length of arbitrary data.
-                    # I forget what it is (TODO lol) but note that this string is close
-                    # to the max.
-                    arbitrary_data = b'/meowcoin-stratum-proxy/'
-                    coinbase_script = op_push(len(bip34_height)) + bip34_height + op_push(len(arbitrary_data)) + arbitrary_data
-                    coinbase_txin = bytes(32) + b'\xff'*4 + var_int(len(coinbase_script)) + coinbase_script + b'\xff'*4
-                    vout_to_miner = b'\x76\xa9\x14' + state.pub_h160 + b'\x88\xac'
-                    vout_to_community = b'\x76\xa9\x14' + base58.b58decode_check(community_address)[1:] + b'\x88\xac'
+                    # The following occurs during both new blocks & new txs & nothing happens for 60s (magic number)
+                    if new_block or new_witness or state.timestamp + 60 < ts:
+                        # Generate coinbase #
 
-                    # Concerning the default_witness_commitment:
-                    # https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#commitment-structure
-                    # Because the coinbase tx is '00'*32 in witness commit,
-                    # We can take what the node gives us directly without changing it
-                    # (This assumes that the txs are in the correct order, but I think
-                    # that is a safe assumption)
+                        if original_state is None:
+                            original_state = deepcopy(state)
 
-                    witness_vout = bytes.fromhex(witness_hex)
+                        bytes_needed_sub_1 = 0
+                        while True:
+                            if state.height <= (2**(7 + (8 * bytes_needed_sub_1))) - 1:
+                                break
+                            bytes_needed_sub_1 += 1
 
-                    state.coinbase_tx = (int(1).to_bytes(4, 'little') + \
-                                    b'\x00\x01' + \
-                                    b'\x01' + coinbase_txin + \
-                                    b'\x03' + \
-                                        coinbase_sats_int.to_bytes(8, 'little') + op_push(len(vout_to_miner)) + vout_to_miner + \
-                                        community_sats_int.to_bytes(8, 'little') + op_push(len(vout_to_community)) + vout_to_community + \
-                                        bytes(8) + op_push(len(witness_vout)) + witness_vout + \
-                                    b'\x01\x20' + bytes(32) + bytes(4))
+                        bip34_height = state.height.to_bytes(bytes_needed_sub_1 + 1, 'little')
 
-                    coinbase_no_wit = int(1).to_bytes(4, 'little') + \
+                        # Note that there is a max allowed length of arbitrary data.
+                        # I forget what it is (TODO lol) but note that this string is close
+                        # to the max.
+                        arbitrary_data = b'/meowcoin-stratum-proxy/'
+                        coinbase_script = op_push(len(bip34_height)) + bip34_height + op_push(len(arbitrary_data)) + arbitrary_data
+                        coinbase_txin = bytes(32) + b'\xff'*4 + var_int(len(coinbase_script)) + coinbase_script + b'\xff'*4
+                        vout_to_miner = b'\x76\xa9\x14' + state.pub_h160 + b'\x88\xac'
+                        vout_to_community = b'\x76\xa9\x14' + base58.b58decode_check(community_address)[1:] + b'\x88\xac'
+
+                        # Concerning the default_witness_commitment:
+                        # https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#commitment-structure
+                        # Because the coinbase tx is '00'*32 in witness commit,
+                        # We can take what the node gives us directly without changing it
+                        # (This assumes that the txs are in the correct order, but I think
+                        # that is a safe assumption)
+
+                        witness_vout = bytes.fromhex(witness_hex)
+
+                        state.coinbase_tx = (int(1).to_bytes(4, 'little') + \
+                                        b'\x00\x01' + \
                                         b'\x01' + coinbase_txin + \
                                         b'\x03' + \
                                             coinbase_sats_int.to_bytes(8, 'little') + op_push(len(vout_to_miner)) + vout_to_miner + \
                                             community_sats_int.to_bytes(8, 'little') + op_push(len(vout_to_community)) + vout_to_community + \
                                             bytes(8) + op_push(len(witness_vout)) + witness_vout + \
-                                        bytes(4)
-                    state.coinbase_txid = dsha256(coinbase_no_wit)
+                                        b'\x01\x20' + bytes(32) + bytes(4))
+
+                        coinbase_no_wit = int(1).to_bytes(4, 'little') + \
+                                            b'\x01' + coinbase_txin + \
+                                            b'\x03' + \
+                                                coinbase_sats_int.to_bytes(8, 'little') + op_push(len(vout_to_miner)) + vout_to_miner + \
+                                                community_sats_int.to_bytes(8, 'little') + op_push(len(vout_to_community)) + vout_to_community + \
+                                                bytes(8) + op_push(len(witness_vout)) + witness_vout + \
+                                            bytes(4)
+                        state.coinbase_txid = dsha256(coinbase_no_wit)
 
 
-                    # Create merkle & update txs
-                    txids = [state.coinbase_txid]
-                    incoming_txs = []
-                    for tx_data in txs_list:
-                        incoming_txs.append(tx_data['data'])
-                        txids.append(bytes.fromhex(tx_data['txid'])[::-1])
-                    state.externalTxs = incoming_txs
-                    merkle = merkle_from_txids(txids)
+                        # Create merkle & update txs
+                        txids = [state.coinbase_txid]
+                        incoming_txs = []
+                        for tx_data in txs_list:
+                            incoming_txs.append(tx_data['data'])
+                            txids.append(bytes.fromhex(tx_data['txid'])[::-1])
+                        state.externalTxs = incoming_txs
+                        merkle = merkle_from_txids(txids)
 
-                    # Done create merkle & update txs
+                        # Done create merkle & update txs
 
-                    state.header = version_int.to_bytes(4, 'little') + \
-                            state.prevHash + \
-                            merkle + \
-                            ts.to_bytes(4, 'little') + \
-                            bytes.fromhex(bits_hex)[::-1] + \
-                            state.height.to_bytes(4, 'little')
+                        state.header = version_int.to_bytes(4, 'little') + \
+                                state.prevHash + \
+                                merkle + \
+                                ts.to_bytes(4, 'little') + \
+                                bytes.fromhex(bits_hex)[::-1] + \
+                                state.height.to_bytes(4, 'little')
 
-                    state.headerHash = dsha256(state.header)[::-1].hex()
-                    state.timestamp = ts
+                        state.headerHash = dsha256(state.header)[::-1].hex()
+                        state.timestamp = ts
 
-                    state.job_counter += 1
-                    add_old_state_to_queue(old_states, original_state, drop_after)
+                        state.job_counter += 1
+                        add_old_state_to_queue(old_states, original_state, drop_after)
 
-                    if SHOW_JOBS:
-                        state.logger.info('New %s job diff \x1b[1m%s\x1b[0m height \x1b[1m%d\x1b[0m',
-                                        state.tag, formatDiff(target_hex), state.height)                
+                        if SHOW_JOBS:
+                            state.logger.info('New %s job diff \x1b[1m%s\x1b[0m height \x1b[1m%d\x1b[0m',
+                                            state.tag, formatDiff(target_hex), state.height)                
 
-                    for session in state.all_sessions:
+                        for session in state.all_sessions:
+                            await session.send_notification('mining.set_target', (target_hex,))
+                            await session.send_notification('mining.notify', (hex(state.job_counter)[2:], state.headerHash, state.seedHash.hex(), target_hex, True, state.height, bits_hex))
+                    
+                    for session in state.new_sessions:
+                        state.all_sessions.add(session)
                         await session.send_notification('mining.set_target', (target_hex,))
                         await session.send_notification('mining.notify', (hex(state.job_counter)[2:], state.headerHash, state.seedHash.hex(), target_hex, True, state.height, bits_hex))
-                
-                for session in state.new_sessions:
-                    state.all_sessions.add(session)
-                    await session.send_notification('mining.set_target', (target_hex,))
-                    await session.send_notification('mining.notify', (hex(state.job_counter)[2:], state.headerHash, state.seedHash.hex(), target_hex, True, state.height, bits_hex))
-                
-                state.new_sessions.clear()
+                    
+                    state.new_sessions.clear()
 
-            except Exception as e:
-                state.logger.critical('RPC error for getblocktemplate: %s', str(e))
-                state.logger.critical('Sleeping for 5 minutes.')
-                state.logger.critical('Any solutions found during this time may not be current.')
-                state.logger.critical('Try restarting the proxy.')
-                await asyncio.sleep(300)
+                except Exception as e:
+                    state.logger.critical('RPC error for getblocktemplate: %s', str(e))
+                    state.logger.critical('Sleeping for 5 minutes.')
+                    state.logger.critical('Any solutions found during this time may not be current.')
+                    state.logger.critical('Try restarting the proxy.')
+                    await asyncio.sleep(300)
+    except Exception as e:
+        state.logger.critical('An unexpected error occurred in stateUpdater: %s', str(e))
+        state.logger.critical('Sleeping for 5 minutes.')
+        state.logger.critical('Any solutions found during this time may not be current.')
+        state.logger.critical('Try restarting the proxy.')
+        await asyncio.sleep(300)
 
 def main():
 
