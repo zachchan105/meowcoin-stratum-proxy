@@ -8,10 +8,11 @@ services:
       - "54321:54321"
     environment:
       - RPC_HOST=127.0.0.1
-      - RPC_PORT=9766
+      - RPC_PORT=9788
       - RPC_USER=rpcuser
       - RPC_PASS=rpcpass
-      - VERBOSE=false
+      - TESTNET=true
+      - VERBOSE=true
     command: >
       python meowcoin-stratum-proxy.py
       --address 0.0.0.0
@@ -20,5 +21,6 @@ services:
       --rpcport ${RPC_PORT}
       --rpcuser ${RPC_USER}
       --rpcpass ${RPC_PASS}
+      --testnet
       --verbose
     restart: unless-stopped

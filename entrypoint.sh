@@ -6,6 +6,7 @@ RPC_HOST=${RPC_HOST:-127.0.0.1}
 RPC_PORT=${RPC_PORT:-9766}
 RPC_USER=${RPC_USER:-rpcuser}
 RPC_PASS=${RPC_PASS:-rpcpass}
+TESTNET=${TESTNET:-false}
 VERBOSE=${VERBOSE:-false}
 ADDRESS=${ADDRESS:-0.0.0.0}
 PORT=${PORT:-54321}
@@ -20,6 +21,11 @@ CMD_ARGS=(
     "--rpcpass" "$RPC_PASS"
 )
 
+# Add testnet flag if enabled
+if [ "$TESTNET" = "true" ]; then
+    CMD_ARGS+=("--testnet")
+fi
+
 # Add optional flags
 if [ "$VERBOSE" = "true" ]; then
     CMD_ARGS+=("--verbose")
@@ -29,6 +35,7 @@ fi
 echo "Starting Meowcoin Stratum Proxy with configuration:"
 echo "  RPC Host: $RPC_HOST:$RPC_PORT"
 echo "  Stratum Address: $ADDRESS:$PORT"
+echo "  Testnet: $TESTNET"
 echo "  Verbose: $VERBOSE"
 echo "  Command: python meowcoin-stratum-proxy.py ${CMD_ARGS[*]}"
 

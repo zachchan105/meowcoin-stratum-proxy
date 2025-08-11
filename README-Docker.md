@@ -16,8 +16,9 @@ This document describes how to deploy the Meowcoin Stratum Proxy using Docker an
    environment:
      - RPC_HOST=127.0.0.1      # Your Meowcoin node IP
      - RPC_PORT=9766            # Your Meowcoin RPC port (mainnet)
-     - RPC_USER=rpcuser      # Your RPC username
-     - RPC_PASS=rpcpass      # Your RPC password
+     - RPC_USER=rpcuser         # Your RPC username
+     - RPC_PASS=rpcpass         # Your RPC password
+     - TESTNET=false            # Set to true for testnet
      - VERBOSE=false            # Set to true for debug logging
    ```
 
@@ -41,17 +42,30 @@ docker run -d \
   -e RPC_PORT=9766 \
   -e RPC_USER=rpcuser \
   -e RPC_PASS=rpcpass \
+  -e TESTNET=false \
   -e VERBOSE=false \
-  zachprice105/meowcoin-stratum-proxy:latest
+  zachprice105/meowcoin-stratum-proxy:main
 ```
 
 ## Network Configuration
 
-The proxy automatically detects the network based on the RPC port:
-- **Mainnet**: Use port `9766` (default)
-- **Testnet**: Use port `19766`
+The proxy supports both mainnet and testnet modes:
 
-No additional `--testnet` flag is needed - the port determines the network.
+### **Mainnet Configuration:**
+```yaml
+environment:
+  - RPC_PORT=9766
+  - TESTNET=false
+```
+
+### **Testnet Configuration:**
+```yaml
+environment:
+  - RPC_PORT=19766
+  - TESTNET=true
+```
+
+**Important**: Both the port AND the `TESTNET=true` flag are required for testnet mode.
 
 ## Kubernetes Deployment
 
@@ -77,6 +91,7 @@ No additional `--testnet` flag is needed - the port determines the network.
 | `RPC_PORT` | `9766` | Meowcoin RPC port (mainnet: 9766, testnet: 19766) |
 | `RPC_USER` | `rpcuser` | RPC username |
 | `RPC_PASS` | `rpcpass` | RPC password |
+| `TESTNET` | `false` | Enable testnet mode (requires both flag and port) |
 | `VERBOSE` | `false` | Enable verbose logging |
 
 ## Ports
@@ -135,6 +150,10 @@ Set these secrets in your GitHub repository:
    - Uses Python 3.11 with optimized package versions
    - SHA3 functionality uses built-in hashlib.sha3_256()
 
+5. **Testnet not working:**
+   - Ensure both `TESTNET=true` AND correct port (19766) are set
+   - Check that the `--testnet` flag is being passed to the proxy
+
 ### Logs
 
 ```bash
@@ -162,4 +181,5 @@ kubectl logs -f deployment/meowcoin-stratum-proxy
 - **Build Tools**: Includes gcc, g++, make, python3-dev for package compilation
 - **Dependencies**: aiohttp, aiorpcX, requests, base58, coloredlogs
 - **SHA3 Implementation**: Uses Python's built-in hashlib.sha3_256() for compatibility
-- **User**: Runs as UID 1000 (meowcoin user) for security 
+- **User**: Runs as UID 1000 (meowcoin user) for security
+- **Testnet Support**: Requires both environment variable and command-line flag 
